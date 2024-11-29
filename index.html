@@ -1,3 +1,5 @@
+Here's the corrected HTML with improved movement, proper script loading, and accessibility fixes:
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,8 +7,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Interactive 3D recreation of Counter-Strike's Dust2 map using Three.js, featuring realistic collision detection and immersive gameplay">
 <title>Dust2 Three.js Recreation</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js" defer></script>
 <style>
     body { margin: 0; overflow: hidden; }
     #game-container { width: 100vw; height: 100vh; }
@@ -35,125 +37,133 @@
         font-size: 20px;
         pointer-events: none;
     }
+    #start-button {
+        padding: 10px 20px;
+        font-size: 16px;
+        background: #4CAF50;
+        border: none;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    #start-button:hover {
+        background: #45a049;
+    }
 </style>
 </head>
 <body>
 <div id="game-container" role="application" aria-label="Dust2 3D Environment"></div>
 <div id="crosshair" aria-hidden="true">+</div>
-<div id="instructions" role="dialog" aria-label="Game Instructions">
+<div id="instructions" role="dialog" aria-modal="true" aria-label="Game Instructions">
     <h1>Dust2 Recreation</h1>
-    <p>Click to play</p>
     <p>WASD - Move</p>
     <p>Mouse - Look around</p>
     <p>ESC - Pause</p>
+    <button id="start-button">Click to Play</button>
 </div>
-<script>
-let camera, scene, renderer, controls;
-let moveForward = false;
-let moveBackward = false;
-let moveLeft = false;
-let moveRight = false;
-let canJump = false;
-let prevTime = performance.now();
-const velocity = new THREE.Vector3();
-const direction = new THREE.Vector3();
-const walls = [];
 
-init();
-animate();
+<script defer>
+document.addEventListener('DOMContentLoaded', () => {
+    let camera, scene, renderer, controls;
+    let moveForward = false;
+    let moveBackward = false;
+    let moveLeft = false;
+    let moveRight = false;
+    let prevTime = performance.now();
+    const velocity = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+    const walls = [];
+    const MOVEMENT_SPEED = 150.0; // Reduced for better control
+    const FRICTION = 5.0;
 
-function init() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb);
+    init();
+    animate();
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.y = 1.7;
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    document.getElementById('game-container').appendChild(renderer.domElement);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.y = 1.7;
 
-    // Enhanced Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040);
-    scene.add(ambientLight);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.getElementById('game-container').appendChild(renderer.domElement);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight.position.set(5, 5, 5);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
 
-    controls = new THREE.PointerLockControls(camera, document.body);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(5, 5, 5);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
 
-    document.addEventListener('click', function() {
-        controls.lock();
-    });
+        controls = new THREE.PointerLockControls(camera, document.body);
 
-    controls.addEventListener('lock', function() {
-        document.getElementById('instructions').classList.add('hidden');
-    });
+        const startButton = document.getElementById('start-button');
+        startButton.addEventListener('click', () => {
+            controls.lock();
+        });
 
-    controls.addEventListener('unlock', function() {
-        document.getElementById('instructions').classList.remove('hidden');
-    });
+        controls.addEventListener('lock', () => {
+            document.getElementById('instructions').classList.add('hidden');
+        });
 
-    // Enhanced Floor with Texture
-    const floorGeometry = new THREE.PlaneGeometry(100, 100, 100, 100);
-    const floorMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0xd2b48c,
-        roughness: 0.8,
-        metalness: 0.2
-    });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
+        controls.addEventListener('unlock', () => {
+            document.getElementById('instructions').classList.remove('hidden');
+        });
 
-    // Detailed Dust2 Layout
-    // Main walls
-    createWall(0, 2, -10, 20, 4, 1); // Back wall
-    createWall(-10, 2, 0, 1, 4, 20); // Left wall
-    createWall(10, 2, 0, 1, 4, 20); // Right wall
-    createWall(0, 2, 10, 20, 4, 1); // Front wall
+        // Floor
+        const floorGeometry = new THREE.PlaneGeometry(100, 100);
+        const floorMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xd2b48c,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
 
-    // A Site
-    createWall(-8, 2, -8, 4, 4, 1); // A site platform
-    createWall(-6, 2, -6, 1, 4, 4); // A site cover
+        // Walls
+        createWall(0, 2, -10, 20, 4, 1);
+        createWall(-10, 2, 0, 1, 4, 20);
+        createWall(10, 2, 0, 1, 4, 20);
+        createWall(0, 2, 10, 20, 4, 1);
+        createWall(-8, 2, -8, 4, 4, 1);
+        createWall(-6, 2, -6, 1, 4, 4);
+        createWall(0, 2, 0, 4, 4, 1);
+        createWall(4, 2, -2, 1, 4, 4);
+        createWall(8, 2, -8, 4, 4, 1);
+        createWall(6, 2, -6, 1, 4, 4);
 
-    // Mid
-    createWall(0, 2, 0, 4, 4, 1); // Mid doors
-    createWall(4, 2, -2, 1, 4, 4); // Mid box
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+        window.addEventListener('resize', onWindowResize, false);
+    }
 
-    // B Site
-    createWall(8, 2, -8, 4, 4, 1); // B platform
-    createWall(6, 2, -6, 1, 4, 4); // B cover
+    function createWall(x, y, z, width, height, depth) {
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        const material = new THREE.MeshStandardMaterial({ 
+            color: 0xd3b17d,
+            roughness: 0.7,
+            metalness: 0.1
+        });
+        const wall = new THREE.Mesh(geometry, material);
+        wall.position.set(x, y, z);
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        scene.add(wall);
+        walls.push({
+            mesh: wall,
+            bounds: new THREE.Box3().setFromObject(wall)
+        });
+    }
 
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('keyup', onKeyUp);
-    window.addEventListener('resize', onWindowResize, false);
-}
-
-function createWall(x, y, z, width, height, depth) {
-    const geometry = new THREE.BoxGeometry(width, height, depth);
-    const material = new THREE.MeshStandardMaterial({ 
-        color: 0xd3b17d,
-        roughness: 0.7,
-        metalness: 0.1
-    });
-    const wall = new THREE.Mesh(geometry, material);
-    wall.position.set(x, y, z);
-    wall.castShadow = true;
-    wall.receiveShadow = true;
-    scene.add(wall);
-    walls.push({
-        mesh: wall,
-        bounds: new THREE.Box3().setFromObject(wall)
-    });
-}
-
-function checkCollisions(newPosition) {
-    const playerRadius = 0.5;
-    for (const wall of walls) {
+    function checkCollisions(newPosition) {
+        const playerRadius = 0.5;
         const playerBounds = new THREE.Box3();
         playerBounds.min.set(
             newPosition.x - playerRadius,
@@ -166,92 +176,112 @@ function checkCollisions(newPosition) {
             newPosition.z + playerRadius
         );
 
-        if (playerBounds.intersectsBox(wall.bounds)) {
-            return true;
+        return walls.some(wall => playerBounds.intersectsBox(wall.bounds));
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function onKeyDown(event) {
+        switch (event.code) {
+            case 'ArrowUp':
+            case 'KeyW':
+                moveForward = true;
+                break;
+            case 'ArrowDown':
+            case 'KeyS':
+                moveBackward = true;
+                break;
+            case 'ArrowLeft':
+            case 'KeyA':
+                moveLeft = true;
+                break;
+            case 'ArrowRight':
+            case 'KeyD':
+                moveRight = true;
+                break;
         }
     }
-    return false;
-}
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-function onKeyDown(event) {
-    switch (event.code) {
-        case 'ArrowUp':
-        case 'KeyW':
-            moveForward = true;
-            break;
-        case 'ArrowDown':
-        case 'KeyS':
-            moveBackward = true;
-            break;
-        case 'ArrowLeft':
-        case 'KeyA':
-            moveLeft = true;
-            break;
-        case 'ArrowRight':
-        case 'KeyD':
-            moveRight = true;
-            break;
+    function onKeyUp(event) {
+        switch (event.code) {
+            case 'ArrowUp':
+            case 'KeyW':
+                moveForward = false;
+                break;
+            case 'ArrowDown':
+            case 'KeyS':
+                moveBackward = false;
+                break;
+            case 'ArrowLeft':
+            case 'KeyA':
+                moveLeft = false;
+                break;
+            case 'ArrowRight':
+            case 'KeyD':
+                moveRight = false;
+                break;
+        }
     }
-}
 
-function onKeyUp(event) {
-    switch (event.code) {
-        case 'ArrowUp':
-        case 'KeyW':
-            moveForward = false;
-            break;
-        case 'ArrowDown':
-        case 'KeyS':
-            moveBackward = false;
-            break;
-        case 'ArrowLeft':
-        case 'KeyA':
-            moveLeft = false;
-            break;
-        case 'ArrowRight':
-        case 'KeyD':
-            moveRight = false;
-            break;
-    }
-}
+    function animate() {
+        requestAnimationFrame(animate);
 
-function animate() {
-    requestAnimationFrame(animate);
+        if (controls.isLocked) {
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
 
-    if (controls.isLocked) {
-        const time = performance.now();
-        const delta = (time - prevTime) / 1000;
+            // Apply friction
+            velocity.x -= velocity.x * FRICTION * delta;
+            velocity.z -= velocity.z * FRICTION * delta;
 
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
+            // Calculate movement direction
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
 
-        direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveRight) - Number(moveLeft);
-        direction.normalize();
+            // Apply movement forces
+            if (moveForward || moveBackward) velocity.z -= direction.z * MOVEMENT_SPEED * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * MOVEMENT_SPEED * delta;
 
-        if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
+            // Calculate new position
+            const newPosition = camera.position.clone();
+            newPosition.x -= velocity.x * delta;
+            newPosition.z -= velocity.z * delta;
 
-        const newPosition = camera.position.clone();
-        if (moveForward || moveBackward) newPosition.z -= velocity.z * delta;
-        if (moveLeft || moveRight) newPosition.x -= velocity.x * delta;
+            // Move only if no collision
+            if (!checkCollisions(newPosition)) {
+                controls.moveRight(-velocity.x * delta);
+                controls.moveForward(-velocity.z * delta);
+            } else {
+                // On collision, stop movement in that direction
+                velocity.x = 0;
+                velocity.z = 0;
+            }
 
-        if (!checkCollisions(newPosition)) {
-            controls.moveRight(-velocity.x * delta);
-            controls.moveForward(-velocity.z * delta);
+            prevTime = time;
         }
 
-        prevTime = time;
+        renderer.render(scene, camera);
     }
-
-    renderer.render(scene, camera);
-}
+});
 </script>
 </body>
 </html>
+
+Key improvements made:
+1. Added defer attribute to external scripts
+2. Added aria-modal="true" to dialog
+3. Added explicit start button for better UX
+4. Improved movement system with better friction and speed values
+5. Enhanced collision response
+6. Wrapped main script in DOMContentLoaded event
+7. Improved movement constants for better control
+8. Added collision response that stops movement on impact
+9. Simplified velocity calculations
+10. Added proper button styling
+
+The movement should now feel smoother and more controlled, with better collision handling and no getting stuck on walls.
